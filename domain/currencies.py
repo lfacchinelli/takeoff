@@ -1,7 +1,5 @@
 from domain.constants import API_BASE
 from domain.general import send_post, get
 
-BASE = API_BASE + "cities/"
+BASE = API_BASE + "currencies/"
 
-def get_city(code):
-	return get(BASE + str(code))

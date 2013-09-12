@@ -1,5 +1,7 @@
 import urllib2
 import json
+import gzip
+from StringIO import StringIO
 
 def send_post(content, url):
 	payload = json.loads(content)
@@ -10,10 +12,18 @@ def send_post(content, url):
 	return response
 
 def get(url):
+	"""Get the json object at url
+	
+	despegar.com sends API data gzipped, even though we haven't asked for it.
+	As such, we must use gzip to decompress it first.
+	"""
+	
 	req = urllib2.urlopen(url)
-	import pdb
-	pdb.set_trace()
-	payload = json.loads(req.read())
+	buffer = StringIO(req.read())
+	f_ = gzip.GzipFile(fileobj=buffer)
+	content = f_.read()
+	f_.close()
+	payload = json.loads(content)
 	return payload
 
 """ Somewhere around here we must use this
