@@ -1,7 +1,12 @@
-"""Module for handling currencies' part of the API"""
+#!/usr/bin/env python3
 
 from domain.constants import API_BASE
-from domain.general import send_post, get
+from domain.general import *
 
-BASE = API_BASE + "currencies/"
 
+class currencies(object):
+    '''Module for handling currencies' part of the API'''
+
+    def __init__(self):
+        '''Init Method'''
+        self.BASE = API_BASE + "currencies/"
