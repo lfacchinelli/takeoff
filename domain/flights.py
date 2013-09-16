@@ -33,10 +33,11 @@ def get_roundtrip_flight(adults="1", children="0", infants="0",
         if arg not in kwargs:
             raise TypeError("Missed a required argument. Required arguments "
                 "are: " + ", ".join(required_args))
-    content = get(BASE + "roundTrip" + "/" + kwargs['orig'] + "/" + kwargs['to'] +
-                "/" + kwargs['departure'] + "/" + kwargs['returning'] + "/" +
-                adults + "/" + children + "/" + infants + "?cabintype=" +
-                cabintype + "&stopsadvancedparameter" + stops)
+    content = get(BASE + "roundTrip" + "/" + kwargs['orig'] + "/" +
+                  kwargs['to'] + "/" + kwargs['departure'] + "/" +
+                  kwargs['returning'] + "/" + adults + "/" + children + "/" +
+                  infants + "?cabintype=" + cabintype +
+                  "&stopsadvancedparameter" + stops)
     result = {}
     if 'flights' in content:
         result['flights'] = content['flights']
