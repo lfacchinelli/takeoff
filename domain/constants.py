@@ -1,1 +1,1 @@
-API_BASE = "http://api.despegar.com/"
+API_BASE = "https://api.despegar.com/"

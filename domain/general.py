@@ -1,7 +1,7 @@
 import urllib.request, urllib.error, urllib.parse
 import json
 import gzip
-from io import StringIO
+from io import StringIO, BytesIO
 
 def send_post(content, url):
     payload = json.loads(content)
@@ -19,11 +19,11 @@ def get(url):
     As such, we must use gzip to decompress it first.
     """
     req = urllib.request.urlopen(url)
-    buffer = StringIO(req.read())
+    buffer = BytesIO(req.read())
     f_ = gzip.GzipFile(fileobj=buffer)
     content = f_.read()
     f_.close()
-    payload = json.loads(content)
+    payload = json.loads(content.decode())
     return payload
 
 def validate_params(paramlist):
