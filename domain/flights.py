@@ -67,8 +67,6 @@ def get_best_flights(flights_raw):
             if id is not None:
                 ids.append(id)
     best_flights = []
-    import pdb
-    pdb.set_trace()
     for id in ids:
         best_flights.append([flight for flight in flights_raw['flights'] if flight['id'] == id][0])
     return best_flights
