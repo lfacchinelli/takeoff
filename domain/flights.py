@@ -51,3 +51,24 @@ def get_roundtrip_flight(adults="1", children="0", infants="0",
     #...   pprint.pprint(item)
 
     return result
+
+def get_best_flights(flights_raw):
+    """Return best flights data
+    
+    Required arguments:
+    flights_raw: a dict containing two elements, as returned by
+                    get_roundtrip_flight
+    
+    Returns a list of the best flights for each airline
+    """
+    ids = []
+    for item in flights_raw['matrix']:
+        for id in iter(item['clustersByStops'].values()):
+            if id is not None:
+                ids.append(id)
+    best_flights = []
+    import pdb
+    pdb.set_trace()
+    for id in ids:
+        best_flights.append([flight for flight in flights_raw['flights'] if flight['id'] == id][0])
+    return best_flights
