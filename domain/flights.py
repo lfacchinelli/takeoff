@@ -70,3 +70,66 @@ def get_best_flights(flights_raw):
     for id in ids:
         best_flights.append([flight for flight in flights_raw['flights'] if flight['id'] == id][0])
     return best_flights
+
+def get_flights_summary(best_flights):
+    
+    """
+    inboundRoutes and/or outboundRoutes can have more than one element, if there are alternatives
+    datetime are in local target airport time?
+    yes, total duration = duration1 + duration2 + ... + durationN + tzdiff
+    ['priceInfo']['total']['fare']
+    ['inboundRoutes']:
+        list of each ending route (from DEST to SRC on ENDDATE). interesting thingies:
+            'duration', 'hasAirportChange'
+            'segments' (if stops='ONE or 'MORE_THAN_ONE', then this list has more than 1 element):
+                'departure':
+                    'locationDescription'
+                'arrival':
+                    'locationDescription'
+                'duration', 'marketingCarrierDescription', 'operatingCarrierDescription'
+    ['outboundRoutes']:
+        same as 'inboundRoutes', but from SRC to DEST on STARTDATE
+    """
+    summary = []
+    for flight in best_flights:
+        price = flight['priceInfo']['total']['fare']
+        out_flights = []
+        for item in flight['outboundRoutes']:
+            out_flight = {}
+            out_flight['duration'] = item['duration']
+            out_flight['changes_airport'] = item['hasAirportChange']
+            out_flight['start_routes'] = []
+            for seg_ in item['segments']:
+                segment = {}
+                segment['departure'] = {}
+                segment['arrival'] = {}
+                segment['departure']['airport']= seg_['departure']['locationDescription']
+                segment['departure']['date']= seg_['departure']['date']
+                segment['departure']['timezone']= seg_['departure']['timezone']
+                segment['arrival']['airport']= seg_['arrival']['locationDescription']
+                segment['arrival']['date']= seg_['arrival']['date']
+                segment['arrival']['timezone']= seg_['arrival']['timezone']
+                segment['duration'] = seg_['duration']
+                segment['carrier'] = seg_['marketingCarrierDescription']
+                segment['actual_carrier'] = seg_['operatingCarrierDescription']
+                out_flight['start_routes'].append(segment)
+        in_flights = []
+        for item in flight['inboundRoutes']:
+            in_flight = {}
+            in_flight['duration'] = item['duration']
+            in_flight['changes_airport'] = item['hasAirportChange']
+            in_flight['end_routes'] = []
+            for seg_ in item['segments']:
+                segment = {}
+                segment['departure'] = {}
+                segment['arrival'] = {}
+                segment['departure']['airport']= seg_['departure']['locationDescription']
+                segment['departure']['date']= seg_['departure']['date']
+                segment['departure']['timezone']= seg_['departure']['timezone']
+                segment['arrival']['airport']= seg_['arrival']['locationDescription']
+                segment['arrival']['date']= seg_['arrival']['date']
+                segment['arrival']['timezone']= seg_['arrival']['timezone']
+                segment['duration'] = seg_['duration']
+                segment['carrier'] = seg_['marketingCarrierDescription']
+                segment['actual_carrier'] = seg_['operatingCarrierDescription']
+                in_flight['end_routes'].append(segment)
