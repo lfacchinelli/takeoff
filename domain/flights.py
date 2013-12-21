@@ -62,13 +62,24 @@ def get_best_flights(flights_raw):
     Returns a list of the best flights for each airline
     """
     ids = []
+
     for item in flights_raw['matrix']:
         for id in iter(item['clustersByStops'].values()):
             if id is not None:
-                ids.append(id)
+                # It appears despegar.com is returning IDs in the matrix that
+                # do not exist in the raw flight data. IDK why it's doing this,
+                # but the following fixes it.
+                # NOTE THAT WE ARE EXCLUDING FLIGHTS HERE. Maybe the hard-coded
+                # conditions with which we searched are to blame?
+                if id in [flight['id'] for flight in flights_raw['flights'] if flight['id'] == id]:
+                    ids.append(id)
     best_flights = []
+    import ipdb
+    ipdb.set_trace()
     for id in ids:
-        best_flights.append([flight for flight in flights_raw['flights'] if flight['id'] == id][0])
+        cosito = [flight for flight in flights_raw['flights'] if flight['id'] == id]
+        best_flights.append(
+            [flight for flight in flights_raw['flights'] if flight['id'] == id][0])
     return best_flights
 
 def get_flights_summary(best_flights):
@@ -134,3 +145,19 @@ def get_flights_summary(best_flights):
         summary_flight['end_flights'] = in_flights
         summary.append(summary_flight)
     return summary
+
+def cheapest_flight(**kwargs):
+    """
+    Find out for a given start date and duration, origin and destination, the
+    best flight available in a given timespan (e.g. 90 days after start date).
+    
+    This mimics despegar.com's 'Find best flight', which typically has a 60-90
+    days' timespan. We intend to make it configurable and query the API in
+    a threaded way so as to be more efficient. We hope not to get banned :)
+    """
+    
+    required_args = ['start_date', 'duration', 'timespan', 'orig', 'to']
+    for arg in required_args:
+        if arg not in kwargs:
+            raise TypeError("Missed a required argument. Required arguments "
+                "are: " + ", ".join(required_args))
