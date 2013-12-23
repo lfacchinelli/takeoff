@@ -74,8 +74,6 @@ def get_best_flights(flights_raw):
                 if id in [flight['id'] for flight in flights_raw['flights'] if flight['id'] == id]:
                     ids.append(id)
     best_flights = []
-    import ipdb
-    ipdb.set_trace()
     for id in ids:
         cosito = [flight for flight in flights_raw['flights'] if flight['id'] == id]
         best_flights.append(
