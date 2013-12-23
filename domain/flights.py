@@ -1,5 +1,8 @@
 """Module for handling flights' part of the API"""
 
+import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from domain.constants import API_BASE
 from domain.general import send_post, get
 
@@ -142,7 +145,8 @@ def get_flights_summary(best_flights):
             in_flights.append(in_flight)
         summary_flight['end_flights'] = in_flights
         summary.append(summary_flight)
-    return summary
+    # Return summary, sorted by price
+    return sorted(summary,  key=lambda item: item['price'])
 
 def cheapest_flight(**kwargs):
     """
@@ -159,3 +163,30 @@ def cheapest_flight(**kwargs):
         if arg not in kwargs:
             raise TypeError("Missed a required argument. Required arguments "
                 "are: " + ", ".join(required_args))
+    
+    start_date = datetime.datetime.strptime(kwargs['start_date'], '%Y-%m-%d').date()
+    duration = kwargs['duration']
+    timespan = kwargs['timespan']
+    end_date = start_date + datetime.timedelta(days=duration)
+    orig = kwargs['orig']
+    to = kwargs['to']
+    
+    target_args = []
+    
+    for diff in range(timespan):
+        start = (start_date + datetime.timedelta(days=diff)).strftime('%Y-%m-%d')
+        end = (end_date + datetime.timedelta(days=diff)).strftime('%Y-%m-%d')
+        kw = {}
+        kw['orig'] = orig
+        kw['to'] = to
+        kw['departure'] = start
+        kw['returning'] = end
+        target_args.append(kw)
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        future_to_data = {executor.submit(get_roundtrip_flight, **kw): kw for kw in target_args}
+        for future in as_completed(future_to_data):
+            kw = future_to_data[future]
+            flights_raw = future.result()
+            best_flights = get_best_flights(flights_raw)
+            summary = get_flights_summary(best_flights)
+            print(str(kw) + ": " + str(summary[0]['price']))
