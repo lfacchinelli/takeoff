@@ -118,9 +118,10 @@ def get_flights_summary(best_flights):
                 segment['duration'] = seg_['duration']
                 segment['carrier'] = seg_['marketingCarrierDescription']
                 segment['actual_carrier'] = seg_['operatingCarrierDescription']
+                segment['code'] = seg_['operatingCarrierCode']
                 out_flight['start_routes'].append(segment)
             out_flights.append(out_flight)
-        summary_flight['start_flights'] = out_flights
+        summary_flight['start_flights'] = sorted(out_flights, key=lambda item: item['duration'])
         in_flights = []
         for item in flight['inboundRoutes']:
             in_flight = {}
@@ -141,9 +142,10 @@ def get_flights_summary(best_flights):
                 segment['duration'] = seg_['duration']
                 segment['carrier'] = seg_['marketingCarrierDescription']
                 segment['actual_carrier'] = seg_['operatingCarrierDescription']
+                segment['code'] = seg_['operatingCarrierCode']
                 in_flight['end_routes'].append(segment)
             in_flights.append(in_flight)
-        summary_flight['end_flights'] = in_flights
+        summary_flight['end_flights'] = sorted(in_flights, key=lambda item: item['duration'])
         summary.append(summary_flight)
     # Return summary, sorted by price
     return sorted(summary,  key=lambda item: item['price'])
@@ -151,11 +153,21 @@ def get_flights_summary(best_flights):
 def cheapest_flight(**kwargs):
     """
     Find out for a given start date and duration, origin and destination, the
-    best flight available in a given timespan (e.g. 90 days after start date).
+    best flights available in a given timespan (e.g. 90 days after start date).
     
     This mimics despegar.com's 'Find best flight', which typically has a 60-90
-    days' timespan. We intend to make it configurable and query the API in
+    days' timespan. We make it configurable and query the API in
     a threaded way so as to be more efficient. We hope not to get banned :)
+    
+    Required arguments:
+    orig: 3-letter code for airport or city of origin
+    to: 3-letter code for airport or city of destination
+    start_date: yyyy-mm-dd date of departure
+    duration: an integer determining how many days are between start_date and
+        end_date (we don't ask you for end_date as it will be calculated
+    timespan: an integer determining how many days after start_date you wish
+        to query with the same values (duration of your trip, origin and
+        destination)
     """
     
     required_args = ['start_date', 'duration', 'timespan', 'orig', 'to']
@@ -182,6 +194,7 @@ def cheapest_flight(**kwargs):
         kw['departure'] = start
         kw['returning'] = end
         target_args.append(kw)
+    cheapest_flights = {}
     with ThreadPoolExecutor(max_workers=20) as executor:
         future_to_data = {executor.submit(get_roundtrip_flight, **kw): kw for kw in target_args}
         for future in as_completed(future_to_data):
@@ -189,4 +202,19 @@ def cheapest_flight(**kwargs):
             flights_raw = future.result()
             best_flights = get_best_flights(flights_raw)
             summary = get_flights_summary(best_flights)
-            print(str(kw) + ": " + str(summary[0]['price']))
+            best_flight = summary[0]
+            data = {}
+            data['id'] = best_flight['id']
+            data['price'] = best_flight['price']
+            data['carrier'] = best_flight['start_flights'][0]['start_routes'][0]['actual_carrier']
+            data['carriercode'] = best_flight['start_flights'][0]['start_routes'][0]['code']
+            data['start_duration'] = best_flight['start_flights'][0]['duration']
+            data['end_duration'] = best_flight['end_flights'][0]['duration']
+            data['start_date'] = kw['departure']
+            data['end_date'] = kw['returning']
+            if cheapest_flights.get(data['price']) is None:
+                cheapest_flights[data['price']] = []
+            cheapest_flights[data['price']].append(data)
+    prices = list(cheapest_flights.keys())
+    prices.sort()
+    return cheapest_flights[prices[0]]
