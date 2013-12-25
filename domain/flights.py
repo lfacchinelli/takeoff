@@ -40,19 +40,51 @@ def get_roundtrip_flight(adults="1", children="0", infants="0",
                   kwargs['to'] + "/" + kwargs['departure'] + "/" +
                   kwargs['returning'] + "/" + adults + "/" + children + "/" +
                   infants + "?cabintype=" + cabintype +
-                  "&stopsadvancedparameter" + stops)
+                  "&stopsadvancedparameter=" + stops)
     result = {}
     if 'flights' in content:
         result['flights'] = content['flights']
     if 'meta' in content:
         if 'summaryMatrix' in content['meta']:
             result['matrix'] = content['meta']['summaryMatrix']
-    
-    # Based on both parts of result, specific info can be obtained, like:
-    #>>> for item in res['flights']:
-    #...  if item['id'] == 'C_141258592_457465048_-1265597135_-430519781':
-    #...   pprint.pprint(item)
+    return result
 
+def get_mult_flights(adults="1", children="0", infants="0",
+                         cabintype="ECONOMY", stops="MORE_THAN_ONE", **kwargs):
+    """Return info on multiple flights
+    
+    Required arguments:
+    orig: comma-separated list of 3-letter code for airport or city of origin
+    to: comma-separated list of 3-letter code for airport or city of destination
+    departure: comma-separated list of yyyy-mm-dd dates of departure
+    
+    The rest of the information required/returned is the same as
+    get_roundtrip_flight. Required arguments for this function must have commas
+    in them, so that despegar.com can match, e.g.:
+    - flight from orig[0] to to[0] on departure[0]
+    - flight from orig[1] to to[0] on departure[1]
+    """
+    required_args = ['orig', 'to', 'departure']
+    for arg in required_args:
+        if arg not in kwargs:
+            raise TypeError("Missed a required argument. Required arguments "
+                "are: " + ", ".join(required_args))
+        if kwargs[arg].find(',') == -1:
+            raise TypeError("Arguments in this function must have commas!")
+    
+    content = get(BASE + "multipleDestinations" + "/" + kwargs['orig'] + "/" +
+                kwargs['to'] + "/" + kwargs['departure'] + "/" + adults + "/" +
+                children + "/" + infants + "?cabintype=" + cabintype +
+                "&stopsadvancedparameter=" + stops)
+    result = {}
+    if 'flights' in content:
+        result['flights'] = content['flights']
+        for item in result['flights']:
+            # Copy each flight's 'id' to its root so we can work it as usual
+            item['id'] = item['itineraryInfo']['id']
+    if 'meta' in content:
+        if 'summaryMatrix' in content['meta']:
+            result['matrix'] = content['meta']['summaryMatrix']
     return result
 
 def get_best_flights(flights_raw):
@@ -65,20 +97,15 @@ def get_best_flights(flights_raw):
     Returns a list of the best flights for each airline
     """
     ids = []
-
     for item in flights_raw['matrix']:
         for id in iter(item['clustersByStops'].values()):
             if id is not None:
-                # It appears despegar.com is returning IDs in the matrix that
-                # do not exist in the raw flight data. IDK why it's doing this,
-                # but the following fixes it.
-                # NOTE THAT WE ARE EXCLUDING FLIGHTS HERE. Maybe the hard-coded
-                # conditions with which we searched are to blame?
+                # Needed not to break when despegar.com returns IDs in the
+                # matrix that are not in the raw data.
                 if id in [flight['id'] for flight in flights_raw['flights'] if flight['id'] == id]:
                     ids.append(id)
     best_flights = []
     for id in ids:
-        cosito = [flight for flight in flights_raw['flights'] if flight['id'] == id]
         best_flights.append(
             [flight for flight in flights_raw['flights'] if flight['id'] == id][0])
     return best_flights
@@ -98,66 +125,47 @@ def get_flights_summary(best_flights):
         summary_flight = {}
         summary_flight['id'] = flight['id']
         summary_flight['price'] = flight['priceInfo']['total']['fare']
-        out_flights = []
-        for item in flight['outboundRoutes']:
-            out_flight = {}
-            out_flight['duration'] = item['duration']
-            out_flight['changes_airport'] = item['hasAirportChange']
-            out_flight['start_routes'] = []
-            for seg_ in item['segments']:
-                segment = {}
-                segment['departure'] = {}
-                segment['arrival'] = {}
-                segment['departure']['airport']= seg_['departure']['locationDescription']
-                segment['departure']['date']= seg_['departure']['date']
-                segment['departure']['timezone']= seg_['departure']['timezone']
-                segment['arrival']['airport']= seg_['arrival']['locationDescription']
-                segment['arrival']['date']= seg_['arrival']['date']
-                segment['arrival']['timezone']= seg_['arrival']['timezone']
-                segment['type'] = seg_['marketingCabinTypeCode']
-                segment['duration'] = seg_['duration']
-                segment['carrier'] = seg_['marketingCarrierDescription']
-                segment['actual_carrier'] = seg_['operatingCarrierDescription']
-                segment['code'] = seg_['operatingCarrierCode']
-                out_flight['start_routes'].append(segment)
-            out_flights.append(out_flight)
-        summary_flight['start_flights'] = sorted(out_flights, key=lambda item: item['duration'])
-        in_flights = []
-        for item in flight['inboundRoutes']:
-            in_flight = {}
-            in_flight['duration'] = item['duration']
-            in_flight['changes_airport'] = item['hasAirportChange']
-            in_flight['end_routes'] = []
-            for seg_ in item['segments']:
-                segment = {}
-                segment['departure'] = {}
-                segment['arrival'] = {}
-                segment['departure']['airport']= seg_['departure']['locationDescription']
-                segment['departure']['date']= seg_['departure']['date']
-                segment['departure']['timezone']= seg_['departure']['timezone']
-                segment['arrival']['airport']= seg_['arrival']['locationDescription']
-                segment['arrival']['date']= seg_['arrival']['date']
-                segment['arrival']['timezone']= seg_['arrival']['timezone']
-                segment['type'] = seg_['marketingCabinTypeCode']
-                segment['duration'] = seg_['duration']
-                segment['carrier'] = seg_['marketingCarrierDescription']
-                segment['actual_carrier'] = seg_['operatingCarrierDescription']
-                segment['code'] = seg_['operatingCarrierCode']
-                in_flight['end_routes'].append(segment)
-            in_flights.append(in_flight)
-        summary_flight['end_flights'] = sorted(in_flights, key=lambda item: item['duration'])
+        routes = []
+        routekeys = ['outboundRoutes', 'inboundRoutes', 'routes']
+        for key in routekeys:
+            if key in flight.keys():
+                for item in flight[key]:
+                    if item['type'] == 'AIR':
+                        route = {}
+                        route['duration'] = item['duration']
+                        route['changes_airport'] = item['hasAirportChange']
+                        route['segments'] = []
+                        for seg_ in item['segments']:
+                            segment = {}
+                            segment['departure'] = {}
+                            segment['arrival'] = {}
+                            segment['departure']['airport']= seg_['departure']['locationDescription']
+                            segment['departure']['date']= seg_['departure']['date']
+                            segment['departure']['timezone']= seg_['departure']['timezone']
+                            segment['arrival']['airport']= seg_['arrival']['locationDescription']
+                            segment['arrival']['date']= seg_['arrival']['date']
+                            segment['arrival']['timezone']= seg_['arrival']['timezone']
+                            segment['type'] = seg_['marketingCabinTypeCode']
+                            segment['duration'] = seg_['duration']
+                            segment['carrier'] = seg_['marketingCarrierDescription']
+                            segment['actual_carrier'] = seg_['operatingCarrierDescription']
+                            segment['code'] = seg_['operatingCarrierCode']
+                            route['segments'].append(segment)
+                        routes.append(route)
+        #summary_flight['routes'] = sorted(routes, key=lambda item: item['segments']['departure']['date'])
+        summary_flight['routes'] = routes
         summary.append(summary_flight)
     # Return summary, sorted by price
     return sorted(summary,  key=lambda item: item['price'])
 
-def cheapest_flight(**kwargs):
-    """
-    Find out for a given start date and duration, origin and destination, the
+
+def cheapest_roundtrip_flight(**kwargs):
+    """Find out for a given start date and duration, origin and destination, the
     best flights available in a given timespan (e.g. 90 days after start date).
     
     This mimics despegar.com's 'Find best flight', which typically has a 60-90
     days' timespan. We make it configurable and query the API in
-    a threaded way so as to be more efficient. We hope not to get banned :)
+    a threaded way so as to be more efficient.
     
     Required arguments:
     orig: 3-letter code for airport or city of origin
@@ -176,9 +184,9 @@ def cheapest_flight(**kwargs):
             raise TypeError("Missed a required argument. Required arguments "
                 "are: " + ", ".join(required_args))
     
-    start_date = datetime.datetime.strptime(kwargs['start_date'], '%Y-%m-%d').date()
     duration = kwargs['duration']
     timespan = kwargs['timespan']
+    start_date = datetime.datetime.strptime(kwargs['start_date'], '%Y-%m-%d').date()
     end_date = start_date + datetime.timedelta(days=duration)
     orig = kwargs['orig']
     to = kwargs['to']
@@ -194,9 +202,60 @@ def cheapest_flight(**kwargs):
         kw['departure'] = start
         kw['returning'] = end
         target_args.append(kw)
+    
+    return cheapest_flights_caller(0, target_args)
+
+def cheapest_mult_flight(**kwargs):
+    """Same as cheapest_roundtrip_flight but for multiple destinations.
+    
+    Instead of start_date and duration, a single argument 'departures' must be
+    provided, alongside orig, to and timespan. Sans timespan, all the others
+    must have the same amount of commas in them.
+    """
+    
+    required_args = ['departures', 'timespan', 'orig', 'to']
+    for arg in required_args:
+        if arg not in kwargs:
+            raise TypeError("Missed a required argument. Required arguments "
+                "are: " + ", ".join(required_args))
+        if arg != 'timespan':
+            if kwargs[arg].find(',') == -1:
+                raise TypeError("Arguments in this function must have commas!")
+        else:
+            if type(kwargs[arg]) != type(1):
+                raise TypeError("Timespan must be an integer!")
+    
+    timespan = kwargs['timespan']
+    int_start_dates = [datetime.datetime.strptime(target_date, '%Y-%m-%d').date() 
+                       for target_date in kwargs['departures'].split(',')]
+    target_args = []
+    orig = kwargs['orig']
+    to = kwargs['to']
+
+    
+    for diff in range(timespan):
+        departure = ','.join(
+                    [(target_date + datetime.timedelta(days=diff)).
+                     strftime('%Y-%m-%d') for target_date in int_start_dates])
+        kw = {}
+        kw['orig'] = orig
+        kw['to'] = to
+        kw['departure'] = departure
+        target_args.append(kw)
+    
+    return cheapest_flights_caller(1, target_args)
+
+def cheapest_flights_caller(mult, target_args):
+    """Caller for both cheapest_roundtrip_flight and cheapest_mult_flight"""
+    
     cheapest_flights = {}
+    if mult == 0:
+        fn = get_roundtrip_flight
+    elif mult == 1:
+        fn = get_mult_flights
+
     with ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_data = {executor.submit(get_roundtrip_flight, **kw): kw for kw in target_args}
+        future_to_data = {executor.submit(fn, **kw): kw for kw in target_args}
         for future in as_completed(future_to_data):
             kw = future_to_data[future]
             flights_raw = future.result()
@@ -206,12 +265,25 @@ def cheapest_flight(**kwargs):
             data = {}
             data['id'] = best_flight['id']
             data['price'] = best_flight['price']
-            data['carrier'] = best_flight['start_flights'][0]['start_routes'][0]['actual_carrier']
-            data['carriercode'] = best_flight['start_flights'][0]['start_routes'][0]['code']
-            data['start_duration'] = best_flight['start_flights'][0]['duration']
-            data['end_duration'] = best_flight['end_flights'][0]['duration']
-            data['start_date'] = kw['departure']
-            data['end_date'] = kw['returning']
+            carriers = []
+            actual_carriers = []
+            for route in best_flight['routes']:
+                for segment in route['segments']:
+                    if segment['carrier'] not in carriers:
+                        carriers.append(segment['carrier'])
+                    if segment['actual_carrier'] not in actual_carriers:
+                        actual_carriers.append(segment['actual_carrier'])
+            data['carriers'] = carriers
+            data['actual_carriers'] = actual_carriers
+            #data['carriercode'] = best_flight['start_flights'][0]['start_routes'][0]['code']
+            #data['start_duration'] = best_flight['start_flights'][0]['duration']
+            #data['end_duration'] = best_flight['end_flights'][0]['duration']
+            data['durations'] = [item['duration'] for item in best_flight['routes']]
+            if mult == 0:
+                data['start_date'] = kw['departure']
+                data['end_date'] = kw['returning']
+            elif mult == 1:
+                data['departures'] = kw['departure']
             if cheapest_flights.get(data['price']) is None:
                 cheapest_flights[data['price']] = []
             cheapest_flights[data['price']].append(data)
