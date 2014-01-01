@@ -1,7 +1,9 @@
 """Module for handling flights' part of the API"""
 
+import time
 import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.error import HTTPError
 
 from domain.constants import API_BASE
 from domain.general import send_post, get
@@ -36,11 +38,19 @@ def get_roundtrip_flight(adults="1", children="0", infants="0",
         if arg not in kwargs:
             raise TypeError("Missed a required argument. Required arguments "
                 "are: " + ", ".join(required_args))
-    content = get(BASE + "roundTrip" + "/" + kwargs['orig'] + "/" +
+    retry = 0
+    content = ""
+    while retry < 10:
+        try:
+            content = get(BASE + "roundTrip" + "/" + kwargs['orig'] + "/" +
                   kwargs['to'] + "/" + kwargs['departure'] + "/" +
                   kwargs['returning'] + "/" + adults + "/" + children + "/" +
                   infants + "?cabintype=" + cabintype +
                   "&stopsadvancedparameter=" + stops)
+            break
+        except HTTPError:
+            retry += 1
+            time.sleep(1)
     result = {}
     if 'flights' in content:
         result['flights'] = content['flights']
@@ -71,11 +81,18 @@ def get_mult_flights(adults="1", children="0", infants="0",
                 "are: " + ", ".join(required_args))
         if kwargs[arg].find(',') == -1:
             raise TypeError("Arguments in this function must have commas!")
-    
-    content = get(BASE + "multipleDestinations" + "/" + kwargs['orig'] + "/" +
+    content = ""
+    retry = 0
+    while retry < 10:
+        try:
+            content = get(BASE + "multipleDestinations" + "/" + kwargs['orig'] + "/" +
                 kwargs['to'] + "/" + kwargs['departure'] + "/" + adults + "/" +
                 children + "/" + infants + "?cabintype=" + cabintype +
                 "&stopsadvancedparameter=" + stops)
+            break
+        except HTTPError:
+            retry += 1
+            time.sleep(1)
     result = {}
     if 'flights' in content:
         result['flights'] = content['flights']
@@ -253,11 +270,13 @@ def cheapest_flights_caller(mult, target_args):
         fn = get_roundtrip_flight
     elif mult == 1:
         fn = get_mult_flights
-
+    #print(target_args)
+    #return
     with ThreadPoolExecutor(max_workers=20) as executor:
         future_to_data = {executor.submit(fn, **kw): kw for kw in target_args}
         for future in as_completed(future_to_data):
             kw = future_to_data[future]
+            flights_raw = future.result()
             flights_raw = future.result()
             best_flights = get_best_flights(flights_raw)
             summary = get_flights_summary(best_flights)
