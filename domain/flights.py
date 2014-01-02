@@ -52,6 +52,8 @@ def get_roundtrip_flight(adults="1", children="0", infants="0",
             retry += 1
             time.sleep(1)
     result = {}
+    if retry == 10:
+        print("Exceeded retry count for " + kwargs['departure'])
     if 'flights' in content:
         result['flights'] = content['flights']
     if 'meta' in content:
@@ -94,6 +96,8 @@ def get_mult_flights(adults="1", children="0", infants="0",
             retry += 1
             time.sleep(1)
     result = {}
+    if retry == 10:
+        print("Exceeded retry count for " + kwargs['departure'])
     if 'flights' in content:
         result['flights'] = content['flights']
         for item in result['flights']:
@@ -200,6 +204,9 @@ def cheapest_roundtrip_flight(**kwargs):
         if arg not in kwargs:
             raise TypeError("Missed a required argument. Required arguments "
                 "are: " + ", ".join(required_args))
+        if arg == 'duration' or arg == 'timespan':
+             if type(kwargs[arg]) != type(1):
+                raise TypeError("Duration/timespan must be an integer!")
     
     duration = kwargs['duration']
     timespan = kwargs['timespan']
@@ -278,7 +285,11 @@ def cheapest_flights_caller(mult, target_args):
             kw = future_to_data[future]
             flights_raw = future.result()
             flights_raw = future.result()
-            best_flights = get_best_flights(flights_raw)
+            try:
+                best_flights = get_best_flights(flights_raw)
+            except Exception as e:
+                print("Had trouble with " + str(kw) + ". Problem was: " + 
+                      e.__repr__())
             summary = get_flights_summary(best_flights)
             best_flight = summary[0]
             data = {}
