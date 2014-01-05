@@ -45,8 +45,7 @@ def get_roundtrip_flight(adults="1", children="0", infants="0",
             content = get(BASE + "roundTrip" + "/" + kwargs['orig'] + "/" +
                   kwargs['to'] + "/" + kwargs['departure'] + "/" +
                   kwargs['returning'] + "/" + adults + "/" + children + "/" +
-                  infants + "?cabintype=" + cabintype +
-                  "&stopsadvancedparameter=" + stops)
+                  infants + "?cabintype=" + cabintype)
             break
         except HTTPError:
             retry += 1
@@ -89,8 +88,7 @@ def get_mult_flights(adults="1", children="0", infants="0",
         try:
             content = get(BASE + "multipleDestinations" + "/" + kwargs['orig'] + "/" +
                 kwargs['to'] + "/" + kwargs['departure'] + "/" + adults + "/" +
-                children + "/" + infants + "?cabintype=" + cabintype +
-                "&stopsadvancedparameter=" + stops)
+                children + "/" + infants + "?cabintype=" + cabintype)
             break
         except HTTPError:
             retry += 1
@@ -276,8 +274,6 @@ def cheapest_flights_caller(mult, target_args):
         fn = get_roundtrip_flight
     elif mult == 1:
         fn = get_mult_flights
-    #print(target_args)
-    #return
     with ThreadPoolExecutor(max_workers=20) as executor:
         future_to_data = {executor.submit(fn, **kw): kw for kw in target_args}
         for future in as_completed(future_to_data):
