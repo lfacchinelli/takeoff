@@ -285,38 +285,40 @@ def cheapest_flights_caller(mult, target_args):
             kw = future_to_data[future]
             flights_raw = future.result()
             flights_raw = future.result()
+            best_flights = None
             try:
                 best_flights = get_best_flights(flights_raw)
             except Exception as e:
                 print("Had trouble with " + str(kw) + ". Problem was: " + 
                       e.__repr__())
-            summary = get_flights_summary(best_flights)
-            best_flight = summary[0]
-            data = {}
-            data['id'] = best_flight['id']
-            data['price'] = best_flight['price']
-            carriers = []
-            actual_carriers = []
-            for route in best_flight['routes']:
-                for segment in route['segments']:
-                    if segment['carrier'] not in carriers:
-                        carriers.append(segment['carrier'])
-                    if segment['actual_carrier'] not in actual_carriers:
-                        actual_carriers.append(segment['actual_carrier'])
-            data['carriers'] = carriers
-            data['actual_carriers'] = actual_carriers
-            #data['carriercode'] = best_flight['start_flights'][0]['start_routes'][0]['code']
-            #data['start_duration'] = best_flight['start_flights'][0]['duration']
-            #data['end_duration'] = best_flight['end_flights'][0]['duration']
-            data['durations'] = [item['duration'] for item in best_flight['routes']]
-            if mult == 0:
-                data['start_date'] = kw['departure']
-                data['end_date'] = kw['returning']
-            elif mult == 1:
-                data['departures'] = kw['departure']
-            if cheapest_flights.get(data['price']) is None:
-                cheapest_flights[data['price']] = []
-            cheapest_flights[data['price']].append(data)
+            if best_flights != None:
+                summary = get_flights_summary(best_flights)
+                best_flight = summary[0]
+                data = {}
+                data['id'] = best_flight['id']
+                data['price'] = best_flight['price']
+                carriers = []
+                actual_carriers = []
+                for route in best_flight['routes']:
+                    for segment in route['segments']:
+                        if segment['carrier'] not in carriers:
+                            carriers.append(segment['carrier'])
+                        if segment['actual_carrier'] not in actual_carriers:
+                            actual_carriers.append(segment['actual_carrier'])
+                data['carriers'] = carriers
+                data['actual_carriers'] = actual_carriers
+                #data['carriercode'] = best_flight['start_flights'][0]['start_routes'][0]['code']
+                #data['start_duration'] = best_flight['start_flights'][0]['duration']
+                #data['end_duration'] = best_flight['end_flights'][0]['duration']
+                data['durations'] = [item['duration'] for item in best_flight['routes']]
+                if mult == 0:
+                    data['start_date'] = kw['departure']
+                    data['end_date'] = kw['returning']
+                elif mult == 1:
+                    data['departures'] = kw['departure']
+                if cheapest_flights.get(data['price']) is None:
+                    cheapest_flights[data['price']] = []
+                cheapest_flights[data['price']].append(data)
     prices = list(cheapest_flights.keys())
     prices.sort()
     return cheapest_flights[prices[0]]
