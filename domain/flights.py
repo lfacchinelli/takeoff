@@ -256,7 +256,6 @@ def cheapest_mult_flight(**kwargs):
     orig = kwargs['orig']
     to = kwargs['to']
 
-    
     for diff in range(timespan):
         departure = ','.join(
                     [(target_date + datetime.timedelta(days=diff)).
@@ -283,7 +282,6 @@ def cheapest_flights_caller(mult, target_args):
         future_to_data = {executor.submit(fn, **kw): kw for kw in target_args}
         for future in as_completed(future_to_data):
             kw = future_to_data[future]
-            flights_raw = future.result()
             flights_raw = future.result()
             best_flights = None
             try:
