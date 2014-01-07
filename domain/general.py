@@ -2,6 +2,7 @@ import urllib.request, urllib.error, urllib.parse
 import json
 import gzip
 from io import StringIO, BytesIO
+import os
 
 def send_post(content, url):
     payload = json.loads(content)
@@ -18,7 +19,9 @@ def get(url):
     despegar.com sends API data gzipped, even though we haven't asked for it.
     As such, we must use gzip to decompress it first.
     """
-    req = urllib.request.urlopen(url)
+    headers = load_headers()
+    intreq = urllib.request.Request(url, headers=headers)
+    req = urllib.request.urlopen(intreq)
     buffer = BytesIO(req.read())
     f_ = gzip.GzipFile(fileobj=buffer)
     content = f_.read()
@@ -31,3 +34,13 @@ def validate_params(paramlist):
     for param in paramlist:
         if not isinstance(param, str) or ' ' in param:
             raise TypeError("Parameters must ALWAYS be strings without spaces.")
+
+def load_headers():
+    """Try to load headers for sending in the request"""
+    
+    try:
+        with open(os.path.expanduser('~') + os.sep + '.headers') as file_:
+            headers = json.loads(file_.read())
+    except:
+        headers = {}
+    return headers
